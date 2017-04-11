@@ -492,6 +492,8 @@ func (p *OAuthProxy) SignOut(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (p *OAuthProxy) OAuthStart(rw http.ResponseWriter, req *http.Request) {
+	p.ClearSessionCookie(rw, req)
+
 	nonce, err := cookie.Nonce()
 	if err != nil {
 		p.ErrorPage(rw, 500, "Internal Error", err.Error())
