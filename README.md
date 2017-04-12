@@ -79,6 +79,62 @@ and the user will be checked against all the provided groups.
 
 Note: The user is checked against the group members list on initial authentication and every time the token is refreshed ( about once an hour ).
 
+#### Mimic Google Cloud Identity Aware Proxy (IAP) Behavior
+
+Using some changes in this branch (clear session on start & using the "prompt=select_account" variable), we can mostly mimic the behaviour of IAP.
+
+Starting out with a configuration already set up for the Google provider, add the following to the config file:
+
+```
+proxy-prefix = "/_oa2"
+skip_provider_button = true
+```
+
+Then configure nginx to use the auth_request module like this:
+
+```nginx
+server {
+  listen 443 ssl spdy;
+  server_name ...;
+  include ssl/ssl.conf;
+
+  location = /_oa2/auth {
+    internal;
+    proxy_pass http://127.0.0.1:4180;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Scheme $scheme;
+  }
+
+  location /_oa2/ {
+    proxy_pass       http://127.0.0.1:4180;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Scheme $scheme;
+  }
+
+  location = /_oa2/sign_in {
+      return       301    /_oa2/start;
+  }
+
+  location / {
+    auth_request /_oa2/auth;
+    # Include the current URI to redirect back to after the auth.
+    error_page 401 = /_oa2/start?rd=$request_uri;
+
+    # pass information via X-User and X-Email headers to backend,
+    # requires running with --set-xauthrequest flag
+    #auth_request_set $user   $upstream_http_x_auth_request_user;
+    #auth_request_set $email  $upstream_http_x_auth_request_email;
+    #proxy_set_header X-User  $user;
+    #proxy_set_header X-Email $email;
+
+    proxy_pass http://backend;
+  }
+
+}
+```
+
 ### Azure Auth Provider
 
 1. [Add an application](https://azure.microsoft.com/en-us/documentation/articles/active-directory-integrating-applications/) to your Azure Active Directory tenant.
